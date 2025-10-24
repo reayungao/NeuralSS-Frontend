@@ -1,24 +1,9 @@
-import { Filesystem, Directory, FileInfo, StatResult } from '@capacitor/filesystem';
+import { Filesystem, Directory, FileInfo } from '@capacitor/filesystem';
 
 export interface ScreenshotFile {
   name: string;
-  dataUrl: string;
+  uri: string;
   mtime: number; // Modification timestamp
-}
-
-const getMimeType = (fileName: string): string => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    switch (extension) {
-        case 'png':
-            return 'image/png';
-        case 'jpg':
-        case 'jpeg':
-            return 'image/jpeg';
-        case 'webp':
-            return 'image/webp';
-        default:
-            return 'application/octet-stream';
-    }
 }
 
 const POTENTIAL_DIRECTORIES = [
@@ -48,34 +33,18 @@ export const readScreenshotDirectory = async (): Promise<ScreenshotFile[]> => {
 
         console.log(`Found screenshots in: ${dirConfig.directory}/${dirConfig.path}`);
         
-        const filePromises = result.files
-            .filter(file => file.type === 'file')
-            .map(async (file: FileInfo) => {
-                try {
-                    const fullPath = `${dirConfig.path}/${file.name}`;
-                    const [fileContent, fileStat] = await Promise.all([
-                        Filesystem.readFile({ path: fullPath, directory: dirConfig.directory }),
-                        Filesystem.stat({ path: fullPath, directory: dirConfig.directory })
-                    ]);
-
-                    const mimeType = getMimeType(file.name);
-                    const dataUrl = `data:${mimeType};base64,${fileContent.data}`;
-                    
-                    return {
-                      name: file.name,
-                      dataUrl: dataUrl,
-                      mtime: fileStat.mtime,
-                    };
-                } catch (readError) {
-                    console.error(`Could not process file ${file.name}:`, readError);
-                    return null;
-                }
-            });
-
-        const settledFiles = await Promise.all(filePromises);
-        const validFiles = settledFiles.filter((f): f is ScreenshotFile => f !== null);
-
-        return validFiles;
+        const validFiles = result.files
+          .filter(file => file.type === 'file')
+          .map((file: FileInfo) => ({
+            name: file.name,
+            uri: file.uri,
+            mtime: file.mtime,
+          }));
+        
+        // This will find the first valid screenshot directory and return its contents
+        if (validFiles.length > 0) {
+            return validFiles;
+        }
 
       } catch (error: any) {
         if (error.message && error.message.includes('Folder does not exist')) {

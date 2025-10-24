@@ -1,4 +1,4 @@
-import OnDeviceAI from '../onDeviceAiPlugin';
+import OnDeviceAI, { AnalysisResult } from '../onDeviceAiPlugin';
 
 let isInitialized = false;
 
@@ -22,20 +22,23 @@ export const initializeOnDeviceModel = async (): Promise<void> => {
 };
 
 /**
- * Analyzes a screenshot using the native on-device model.
- * @param dataUrl The base64 data URL of the screenshot.
- * @returns A promise that resolves to the AI-generated description.
+ * Analyzes a screenshot using the native on-device model via its file URI.
+ * @param uri The native file URI of the screenshot.
+ * @returns A promise that resolves to a structured analysis result object.
  */
-export const analyzeScreenshotOnDevice = async (dataUrl: string): Promise<string> => {
+export const analyzeScreenshotOnDevice = async (uri: string): Promise<AnalysisResult> => {
   if (!isInitialized) {
     throw new Error("AI model is not initialized. Cannot perform analysis.");
   }
   try {
-    const result = await OnDeviceAI.analyze({ imageDataUrl: dataUrl });
-    return result.description;
-  } catch (error) {
+    const result = await OnDeviceAI.analyze({ imageUri: uri });
+    return result;
+  } catch (error: any) {
     console.error("On-device analysis failed:", error);
-    // Return a user-friendly error description
-    return "AI analysis failed for this image.";
+    // Return a structured error that conforms to the AnalysisResult interface
+    return {
+      description: null,
+      error: error.message || "An unknown error occurred during analysis."
+    };
   }
 };

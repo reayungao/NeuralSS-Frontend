@@ -14,7 +14,8 @@ export const ScreenshotDetailModal: React.FC<ScreenshotDetailModalProps> = ({ sc
             await Share.share({
                 title: 'Share Screenshot',
                 text: `Check out this screenshot: ${screenshot.description}`,
-                url: screenshot.dataUrl,
+                // Use the native file URI for sharing
+                url: screenshot.uri,
             });
         } catch (error) {
             console.error('Error sharing screenshot:', error);
@@ -31,7 +32,7 @@ export const ScreenshotDetailModal: React.FC<ScreenshotDetailModalProps> = ({ sc
             <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl m-4 max-w-4xl w-full max-h-[90vh] flex flex-col md:flex-row overflow-hidden">
                 {/* Image Panel */}
                 <div className="md:w-2/3 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
-                    <img src={screenshot.dataUrl} alt={screenshot.name} className="max-w-full max-h-[80vh] object-contain" />
+                    <img src={screenshot.webPath} alt={screenshot.name} className="max-w-full max-h-[80vh] object-contain" />
                 </div>
 
                 {/* Info Panel */}

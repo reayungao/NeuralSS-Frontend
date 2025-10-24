@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { analyzeScreenshotOnDevice, initializeOnDeviceModel } from './services/onDeviceAiService';
-import { readScreenshotDirectory, ScreenshotFile } from './services/androidService';
+import { analyzeScreenshotOnDevice } from './services/onDeviceAiService';
+import { initializeOnDeviceModel } from './services/onDeviceAiService';
+import { readScreenshotDirectory } from './services/androidService';
 import { saveScreenshots, loadScreenshots } from './services/storageService';
 import type { Screenshot } from './types';
 import { Header } from './components/Header';
@@ -10,6 +11,10 @@ import { EmptyState } from './components/EmptyState';
 import { Loader } from './components/Loader';
 import { ScreenshotDetailModal } from './components/ScreenshotDetailModal';
 import { Dialog } from '@capacitor/dialog';
+import { PullToRefreshIndicator } from './components/PullToRefreshIndicator';
+import { Capacitor } from '@capacitor/core';
+
+const PULL_THRESHOLD = 80;
 
 const App: React.FC = () => {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
@@ -19,9 +24,12 @@ const App: React.FC = () => {
   const [loadingTotal, setLoadingTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
   
   const isScanning = useRef(false);
   const isInitialized = useRef(false);
+  const touchStartY = useRef(0);
+  const mainContentRef = useRef<HTMLElement>(null);
 
   const handleDeleteScreenshot = async (screenshotId: string) => {
     const { value } = await Dialog.confirm({
@@ -70,14 +78,21 @@ const App: React.FC = () => {
 
       for (let i = 0; i < newFilesToProcess.length; i++) {
         const file = newFilesToProcess[i];
-        const description = await analyzeScreenshotOnDevice(file.dataUrl);
-        analyzedScreenshots.push({
-          id: file.name,
-          dataUrl: file.dataUrl,
-          description,
-          name: file.name,
-          creationTime: file.mtime,
-        });
+        const result = await analyzeScreenshotOnDevice(file.uri);
+
+        if (result.error || !result.description) {
+            console.error(`Failed to analyze ${file.name}: ${result.error}`);
+            // Optionally, you could create a placeholder with the error message
+        } else {
+            analyzedScreenshots.push({
+              id: file.name,
+              uri: file.uri,
+              webPath: Capacitor.convertFileSrc(file.uri),
+              description: result.description,
+              name: file.name,
+              creationTime: file.mtime,
+            });
+        }
         setLoadingProgress(i + 1);
       }
       
@@ -122,6 +137,14 @@ const App: React.FC = () => {
 
     initializeApp();
   }, [scanForScreenshots]);
+  
+  useEffect(() => {
+    // This effect handles resetting the pull-to-refresh UI after a scan is complete.
+    if (!isLoading && pullDistance > 0) {
+      setPullDistance(0);
+    }
+  }, [isLoading, pullDistance]);
+
 
   const filteredScreenshots = useMemo(() => {
     if (!searchQuery) {
@@ -161,33 +184,84 @@ const App: React.FC = () => {
     return groups;
   }, [filteredScreenshots]);
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (mainContentRef.current && mainContentRef.current.scrollTop === 0) {
+      touchStartY.current = e.targetTouches[0].clientY;
+    } else {
+      touchStartY.current = 0;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current === 0 || isScanning.current) return;
+
+    const currentY = e.targetTouches[0].clientY;
+    const distance = currentY - touchStartY.current;
+
+    if (distance > 0) {
+      // Prevents the browser's native overscroll behavior (page reload)
+      e.preventDefault();
+      // Apply resistance for a more natural feel
+      const resistedDistance = distance < PULL_THRESHOLD
+          ? distance
+          : PULL_THRESHOLD + Math.pow(distance - PULL_THRESHOLD, 0.75);
+      setPullDistance(resistedDistance);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartY.current === 0 || isScanning.current) return;
+
+    if (pullDistance > PULL_THRESHOLD) {
+      scanForScreenshots();
+    } else {
+      setPullDistance(0);
+    }
+    
+    touchStartY.current = 0;
+  };
+  
+  const contentTransform = {
+    transform: `translateY(${isScanning.current ? PULL_THRESHOLD : pullDistance}px)`,
+    transition: pullDistance > 0 && !isScanning.current ? 'none' : 'transform 0.3s ease-out',
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 overflow-hidden">
       {isLoading && loadingTotal > 0 && <Loader progress={loadingProgress} total={loadingTotal} />}
       <Header onRefresh={scanForScreenshots} isScanning={isScanning.current} />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {screenshots.length > 0 && (
-          <div className="mb-8">
-            <SearchBar 
-                searchQuery={searchQuery} 
-                setSearchQuery={setSearchQuery} 
-                disabled={isLoading} 
-            />
-          </div>
-        )}
-        
-        {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <strong className="font-bold">Error: </strong>
-                <span className="block sm:inline">{error}</span>
+      <main 
+        ref={mainContentRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="max-w-7xl h-[calc(100vh-4rem)] overflow-y-auto mx-auto px-4 sm:px-6 lg:px-8 py-8 relative"
+      >
+        <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isScanning.current} />
+        <div style={contentTransform}>
+          {screenshots.length > 0 && (
+            <div className="mb-8">
+              <SearchBar 
+                  searchQuery={searchQuery} 
+                  setSearchQuery={setSearchQuery} 
+                  disabled={isLoading} 
+              />
             </div>
-        )}
+          )}
+          
+          {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 dark:bg-red-900/50 dark:border-red-700 dark:text-red-300" role="alert">
+                  <strong className="font-bold">Error: </strong>
+                  <span className="block sm:inline">{error}</span>
+              </div>
+          )}
 
-        {screenshots.length === 0 && !isLoading && !error ? (
-          <EmptyState />
-        ) : (
-          <ScreenshotGrid screenshotsByGroup={groupedScreenshots} onScreenshotClick={setSelectedScreenshot} />
-        )}
+          {screenshots.length === 0 && !isLoading && !error ? (
+            <EmptyState />
+          ) : (
+            <ScreenshotGrid screenshotsByGroup={groupedScreenshots} onScreenshotClick={setSelectedScreenshot} />
+          )}
+        </div>
       </main>
       
       {selectedScreenshot && (

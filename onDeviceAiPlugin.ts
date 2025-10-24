@@ -1,5 +1,13 @@
 import { registerPlugin, WebPlugin } from '@capacitor/core';
 
+/**
+ * V2: A structured response for analysis, allowing for robust error handling.
+ */
+export interface AnalysisResult {
+  description: string | null;
+  error: string | null; // e.g., "FileReadError", "InferenceFailed", "ModelNotInitialized"
+}
+
 export interface OnDeviceAIPlugin {
   /**
    * Initializes the on-device AI model.
@@ -10,24 +18,26 @@ export interface OnDeviceAIPlugin {
   initialize(): Promise<void>;
 
   /**
-   * Analyzes a single screenshot image.
-   * @param options - An object containing the base64 data URL of the image.
-   * @returns A promise that resolves with the AI-generated description string.
+   * Analyzes a single screenshot image from a native file URI.
+   * This is the preferred method for performance and memory efficiency.
+   * @param options - An object containing the native file URI of the image.
+   * @returns A promise that resolves with a structured analysis result.
    */
-  analyze(options: { imageDataUrl: string }): Promise<{ description: string }>;
+  analyze(options: { imageUri: string }): Promise<AnalysisResult>;
 }
 
-// Web implementation (mock)
+// Web implementation (mock for V2)
 class OnDeviceAIWeb extends WebPlugin implements OnDeviceAIPlugin {
   async initialize(): Promise<void> {
     console.warn('[WEB MOCK] OnDeviceAI.initialize() called. This is a mock implementation for web development.');
     return Promise.resolve();
   }
 
-  async analyze(options: { imageDataUrl: string }): Promise<{ description: string }> {
-    console.warn(`[WEB MOCK] OnDeviceAI.analyze() called for image. Returning dummy data.`);
+  async analyze(options: { imageUri: string }): Promise<AnalysisResult> {
+    console.warn(`[WEB MOCK] OnDeviceAI.analyze() called for image URI: ${options.imageUri}. Returning dummy data.`);
     const mockDescription = `This is a mock analysis for the web. The real AI analysis only runs on a native Android device.`;
-    return Promise.resolve({ description: mockDescription });
+    // On success, the error is null.
+    return Promise.resolve({ description: mockDescription, error: null });
   }
 }
 
