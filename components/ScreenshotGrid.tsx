@@ -16,11 +16,10 @@ const GRID_GAP = 16; // Corresponds to Tailwind's `gap-4`
 export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({ screenshots, onScreenshotClick, isScanning, parentRef }) => {
   const { columnCount, containerWidth } = useResponsiveGrid(parentRef);
 
-  const rowCount = Math.ceil(screenshots.length / columnCount);
+  const isReadyForVirtualization = containerWidth > 0 && screenshots.length > 0;
 
-  // Calculate the width of a single grid item based on container width, column count, and gap
-  const itemWidth = (containerWidth - (GRID_GAP * (columnCount - 1))) / columnCount;
-  // Calculate the height based on the 9:16 aspect ratio
+  const rowCount = isReadyForVirtualization ? Math.ceil(screenshots.length / columnCount) : 0;
+  const itemWidth = isReadyForVirtualization ? (containerWidth - (GRID_GAP * (columnCount - 1))) / columnCount : 0;
   const itemHeight = itemWidth * (16 / 9);
   const rowHeight = itemHeight + GRID_GAP;
 
@@ -38,6 +37,12 @@ export const ScreenshotGrid: React.FC<ScreenshotGridProps> = ({ screenshots, onS
         <p className="text-gray-500 dark:text-gray-400">No screenshots match your search.</p>
       </div>
     );
+  }
+
+  // If the container width isn't measured yet, we can't render the grid.
+  // This prevents passing invalid dimensions to the virtualizer and causing a crash.
+  if (!isReadyForVirtualization) {
+    return null;
   }
 
   const gridClasses = `grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4`;

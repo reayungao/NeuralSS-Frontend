@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { performAiSearch } from '../services/onDeviceAiService';
 import { useSearch } from '../contexts/SearchContext';
 import { SEARCH_DEBOUNCE_MS } from '../config';
+import { isNativeError } from '../types';
 
 interface UseDebouncedAiSearchOptions {
   searchQuery: string;
@@ -37,7 +38,8 @@ export const useDebouncedAiSearch = ({ searchQuery, onSearchStart }: UseDebounce
         }
       } catch (e: any) {
         if (!isCancelled) {
-          setError(e.message || "AI search failed.");
+          const errorMessage = isNativeError(e) ? e.message : "AI search failed.";
+          setError(errorMessage);
           setAiSearchResults(null); // Ensure fallback to local on error
         }
       } finally {
