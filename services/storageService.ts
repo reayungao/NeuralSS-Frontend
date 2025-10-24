@@ -2,6 +2,7 @@ import { Preferences } from '@capacitor/preferences';
 import type { Screenshot } from '../types';
 
 const SCREENSHOTS_STORAGE_KEY = 'analyzed_screenshots';
+const SEARCH_HISTORY_KEY = 'search_history';
 
 /**
  * Saves the entire list of analyzed screenshots to the device's persistent storage.
@@ -35,4 +36,33 @@ export const loadScreenshots = async (): Promise<Screenshot[]> => {
     console.error('Failed to load screenshots from storage:', error);
     return [];
   }
+};
+
+/**
+ * Saves the user's search history to persistent storage.
+ * @param history - An array of search query strings.
+ */
+export const saveSearchHistory = async (history: string[]): Promise<void> => {
+    try {
+        await Preferences.set({
+            key: SEARCH_HISTORY_KEY,
+            value: JSON.stringify(history),
+        });
+    } catch (error) {
+        console.error('Failed to save search history:', error);
+    }
+};
+
+/**
+ * Loads the user's search history from persistent storage.
+ * @returns A promise that resolves to an array of search query strings.
+ */
+export const loadSearchHistory = async (): Promise<string[]> => {
+    try {
+        const { value } = await Preferences.get({ key: SEARCH_HISTORY_KEY });
+        return value ? JSON.parse(value) : [];
+    } catch (error) {
+        console.error('Failed to load search history:', error);
+        return [];
+    }
 };

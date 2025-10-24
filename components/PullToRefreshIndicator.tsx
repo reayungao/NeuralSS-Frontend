@@ -1,15 +1,14 @@
 import React from 'react';
+import { PULL_TO_REFRESH_THRESHOLD } from '../config';
 
 interface PullToRefreshIndicatorProps {
   pullDistance: number;
   isRefreshing: boolean;
 }
 
-const PULL_THRESHOLD = 80;
-
 export const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({ pullDistance, isRefreshing }) => {
-  const isReadyToRefresh = pullDistance > PULL_THRESHOLD;
-  const opacity = isRefreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1);
+  const isReadyToRefresh = pullDistance > PULL_TO_REFRESH_THRESHOLD;
+  const opacity = isRefreshing ? 1 : Math.min(pullDistance / PULL_TO_REFRESH_THRESHOLD, 1);
   const indicatorRotation = isReadyToRefresh ? 'rotate-180' : 'rotate-0';
 
   return (

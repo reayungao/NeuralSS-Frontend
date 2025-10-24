@@ -42,3 +42,21 @@ export const analyzeScreenshotOnDevice = async (uri: string): Promise<AnalysisRe
     };
   }
 };
+
+/**
+ * Performs a semantic search using the on-device AI model.
+ * @param query The user's search query string.
+ * @returns A promise that resolves to an array of matching screenshot IDs.
+ */
+export const performAiSearch = async (query: string): Promise<{ screenshotIds: string[] }> => {
+    if (!isInitialized) {
+        throw new Error("AI model is not initialized. Cannot perform search.");
+    }
+    try {
+        const result = await OnDeviceAI.performSearch({ query });
+        return result;
+    } catch (error: any) {
+        console.error("On-device AI search failed:", error);
+        throw new Error(error.message || "An unknown error occurred during AI search.");
+    }
+};

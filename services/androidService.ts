@@ -1,65 +1,91 @@
+import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, FileInfo } from '@capacitor/filesystem';
 
+/**
+ * Represents a single screenshot file found on the device's filesystem.
+ */
 export interface ScreenshotFile {
-  name: string;
-  uri: string;
-  mtime: number; // Modification timestamp
+  name: string; // e.g., "Screenshot_20230101-120000.png"
+  uri: string; // Native file path URI
+  mtime: number; // Last modification time as a Unix timestamp (milliseconds)
+  thumbnailUri?: string; // Optional URI for a smaller thumbnail image
 }
 
-const POTENTIAL_DIRECTORIES = [
-  { directory: Directory.External, path: 'Pictures/Screenshots' },
-  { directory: Directory.External, path: 'DCIM/Screenshots' },
-  { directory: Directory.External, path: 'Pictures/ScreenShots' }, // Different casing
-  { directory: Directory.External, path: 'Pictures/ScreenCaptures' },
-];
-
+/**
+ * Reads the default screenshot directory on an Android device.
+ * For web/development, it returns an empty array.
+ * @returns A promise that resolves to an array of screenshot file metadata.
+ */
 export const readScreenshotDirectory = async (): Promise<ScreenshotFile[]> => {
+  if (Capacitor.getPlatform() === 'web') {
+    console.warn('[WEB MOCK] readScreenshotDirectory() called. This is a mock implementation for web development. Returning empty array.');
+    // In a web environment, we can't access the native screenshot directory.
+    return [];
+  }
+
+  // Native Android implementation
   try {
-    const permissions = await Filesystem.checkPermissions();
-    if (permissions.publicStorage !== 'granted') {
-        const permissionStatus = await Filesystem.requestPermissions();
-        if (permissionStatus.publicStorage !== 'granted') {
-            console.error('Permission to read external storage was denied.');
-            throw new Error('Storage permission denied.');
+    // On Android, screenshots are typically in Pictures/Screenshots or DCIM/Screenshots
+    const potentialPaths = [
+        { directory: Directory.Pictures, path: 'Screenshots' },
+        { directory: Directory.DCIM, path: 'Screenshots' }
+    ];
+
+    let filesInDir: FileInfo[] = [];
+
+    for (const p of potentialPaths) {
+        try {
+            const result = await Filesystem.readdir({
+                path: p.path,
+                directory: p.directory,
+            });
+            filesInDir = result.files;
+            // If we found files, break out of the loop
+            if (filesInDir.length > 0) break;
+        } catch (e) {
+            console.log(`Could not read screenshot directory at ${p.directory}/${p.path}, trying next location.`);
         }
     }
     
-    for (const dirConfig of POTENTIAL_DIRECTORIES) {
-      try {
-        const result = await Filesystem.readdir({
-          path: dirConfig.path,
-          directory: dirConfig.directory,
-        });
-
-        console.log(`Found screenshots in: ${dirConfig.directory}/${dirConfig.path}`);
-        
-        const validFiles = result.files
-          .filter(file => file.type === 'file')
-          .map((file: FileInfo) => ({
-            name: file.name,
-            uri: file.uri,
-            mtime: file.mtime,
-          }));
-        
-        // This will find the first valid screenshot directory and return its contents
-        if (validFiles.length > 0) {
-            return validFiles;
-        }
-
-      } catch (error: any) {
-        if (error.message && error.message.includes('Folder does not exist')) {
-          console.log(`Directory not found at ${dirConfig.directory}/${dirConfig.path}, trying next.`);
-        } else {
-          console.error(`Error reading directory ${dirConfig.directory}/${dirConfig.path}:`, error);
-        }
-      }
+    if (filesInDir.length === 0) {
+        console.log("No screenshot files found in common directories.");
+        return [];
     }
 
-    console.warn("Could not find a valid screenshot directory.");
-    return [];
+    // We have file info, now get full metadata for each
+    const filePromises = filesInDir.map(async (file): Promise<ScreenshotFile | null> => {
+      try {
+        const statResult = await Filesystem.stat({
+            path: file.uri, // stat using the full URI from readdir result
+        });
+
+        // Filter out directories if any, and only include image files
+        if (statResult.type === 'file' && /\.(png|jpg|jpeg)$/i.test(file.name)) {
+            return {
+              name: file.name,
+              uri: statResult.uri,
+              mtime: statResult.mtime,
+              // Thumbnail generation would be a more complex native task.
+              // For now, we'll omit it.
+              thumbnailUri: undefined, 
+            };
+        }
+        return null;
+      } catch (statError) {
+          console.error(`Could not stat file ${file.uri}:`, statError);
+          return null;
+      }
+    });
+
+    const files = (await Promise.all(filePromises)).filter((file): file is ScreenshotFile => file !== null);
+    
+    // Sort by modification time, newest first
+    return files.sort((a, b) => b.mtime - a.mtime);
 
   } catch (error) {
-    console.error('A critical error occurred while accessing the filesystem:', error);
-    throw error;
+    // This can happen if permissions are denied.
+    console.error('Error reading screenshot directory:', error);
+    // You might want to request permissions here if the error indicates a permission issue.
+    return [];
   }
 };

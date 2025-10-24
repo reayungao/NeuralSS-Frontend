@@ -15,7 +15,9 @@
     "@capacitor/preferences": "^7.0.0",
     "@capacitor/share": "^7.0.0",
     "@capacitor/dialog": "^7.0.0",
-    "@capacitor/core": "^7.1.4"
+    "@capacitor/core": "^7.1.4",
+    "@capacitor/browser": "^7.0.2",
+    "@tanstack/react-virtual": "^3.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
