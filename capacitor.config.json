@@ -1,6 +1,6 @@
 {
-  "appId": "com.example.aiscreenshotgallery",
-  "appName": "AI Screenshot Gallery",
+  "appId": "com.neuralscreenshot.app",
+  "appName": "NeuralSS",
   "webDir": "dist",
   "bundledWebRuntime": false
 }
