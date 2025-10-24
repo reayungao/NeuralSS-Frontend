@@ -1,0 +1,6 @@
+{
+  "appId": "com.example.aiscreenshotgallery",
+  "appName": "AI Screenshot Gallery",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

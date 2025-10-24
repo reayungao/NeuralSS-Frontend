@@ -1,0 +1,8 @@
+{
+  "name": "NeuralSS-Frontend",
+  "description": "An AI-powered screenshot gallery that automatically scans and analyzes your screenshots. Powered by Google AI Edge with the gemma-2b-it-gpu-int4 model for fast, private, and offline semantic search.",
+  "requestAndroidPermissions": [
+    "android.permission.READ_EXTERNAL_STORAGE"
+  ],
+  "requestFramePermissions": []
+}
